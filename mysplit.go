@@ -134,8 +134,7 @@ func (cli *CLI) run(r io.Reader, prefix string, opt *option.Option) error {
 			case option.RoundRobinChunk:
 				onlyLF := regexp.MustCompile(`\r\n|\r|\n`).ReplaceAll(input, []byte("\n"))
 				lines := bytes.Split(onlyLF, []byte("\n"))
-				linesList := splitN(lines, opt.Chunk.N)
-				shuffleRoundRobin(linesList, opt.Chunk.N)
+				linesList := roundRobin(lines, opt.Chunk.N)
 
 				contents := make([][]byte, len(linesList))
 
@@ -162,18 +161,4 @@ func (cli *CLI) write(prefix, suffix string, data []byte) error {
 	}
 
 	return nil
-}
-
-func shuffleRoundRobin[T any](a [][]T, n int) {
-	var idx int
-	b := make([][]T, n)
-
-	for i := range a {
-		b[idx] = append(b[idx], a[i]...)
-
-		idx++
-		if idx >= n {
-			idx = 0
-		}
-	}
 }
