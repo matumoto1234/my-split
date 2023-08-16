@@ -39,7 +39,7 @@ type Option struct {
 func Parse() (*Option, error) {
 	var (
 		l = flag.Int("l", 1000, "put NUMBER lines/records per output file")
-		b = flag.String("b", "3MB", "put NUMBER bytes per output file")
+		b = flag.String("b", "2GB", "put NUMBER bytes per output file")
 		n = flag.String("n", "", "put NUMBER records per output file")
 	)
 
@@ -111,7 +111,7 @@ func parseL(l *int) (int, error) {
 		return 1 << 25, nil
 	}
 
-	if *l < 0 {
+	if *l <= 0 {
 		return 0, fmt.Errorf("invalid number of lines: '%d'", *l)
 	}
 
@@ -139,7 +139,7 @@ func parseB(b *string) (int64, error) {
 		return 0, fmt.Errorf("invalid number of bytes: '%s'", *b)
 	}
 
-	if size < 0 {
+	if size <= 0 {
 		return 0, fmt.Errorf("invalid number of bytes: '%s'", *b)
 	}
 
@@ -191,7 +191,7 @@ func parseN(n *string) (*Chunk, error) {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
 
-		if num < 0 {
+		if num <= 0 {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
 
@@ -216,6 +216,10 @@ func parseN(n *string) (*Chunk, error) {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
 
+		if num <= 0 {
+			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
+		}
+
 		if k <= 0 || k > num {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
@@ -234,6 +238,10 @@ func parseN(n *string) (*Chunk, error) {
 
 		num, err := strconv.Atoi(matched[1])
 		if err != nil {
+			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
+		}
+
+		if num <= 0 {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
 
@@ -258,6 +266,10 @@ func parseN(n *string) (*Chunk, error) {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
 
+		if num <= 0 {
+			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
+		}
+
 		if k <= 0 || k > num {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
@@ -276,6 +288,10 @@ func parseN(n *string) (*Chunk, error) {
 
 		num, err := strconv.Atoi(matched[1])
 		if err != nil {
+			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
+		}
+
+		if num <= 0 {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
 
@@ -301,6 +317,10 @@ func parseN(n *string) (*Chunk, error) {
 
 		num, err := strconv.Atoi(matched[2])
 		if err != nil {
+			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
+		}
+
+		if num <= 0 {
 			return nil, fmt.Errorf("invalid chunk number: '%s'", *n)
 		}
 
