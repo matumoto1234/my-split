@@ -2,11 +2,12 @@ package mysplit
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/matumoto1234/my-split/option"
 	"github.com/pkg/errors"
@@ -14,6 +15,7 @@ import (
 
 type CLI struct {
 	Stdin  io.Reader
+	Stdout io.Writer
 	Dir    string
 }
 
@@ -45,13 +47,14 @@ func (cli *CLI) open(name string) (io.Reader, error) {
 	return buf, nil
 }
 
-func (cli *CLI) run(r io.Reader, prefix string, opts *option.Option) error {
-	var suf string
+func (cli *CLI) run(r io.Reader, prefix string, opt *option.Option) error {
+	var suffix string
+	var chunkIndex int
 
 	for {
-		body := make([]byte, opts.B)
-		n, err := r.Read(body)
-		body = body[:n]
+		input := make([]byte, opt.Byte)
+		n, err := r.Read(input)
+		input = input[:n]
 
 		if err == io.EOF {
 			break
@@ -61,24 +64,89 @@ func (cli *CLI) run(r io.Reader, prefix string, opts *option.Option) error {
 			return err
 		}
 
-		switch option.SplitWay(opts.Way) {
+		switch opt.SplitWay {
 		case option.ByLine:
-			nLines := splitByNLines(body, opts.L)
+			onlyLF := regexp.MustCompile(`\r\n|\r|\n`).ReplaceAll(input, []byte("\n"))
+			lines := bytes.Split(onlyLF, []byte("\n"))
+			nLines := splitByN(lines, opt.Line)
 
 			for _, nLine := range nLines {
-				data := strings.Join(nLine, "\n")
+				data := bytes.Join(nLine, []byte("\n"))
 
-				suf = nextSuffix(suf)
+				suffix = nextSuffix(suffix)
 
-				if err := cli.write(prefix, suf, []byte(data)); err != nil {
+				if err := cli.write(prefix, suffix, data); err != nil {
 					return err
 				}
 			}
 		case option.ByByte:
-			suf = nextSuffix(suf)
+			suffix = nextSuffix(suffix)
 
-			if err := cli.write(prefix, suf, body); err != nil {
+			if err := cli.write(prefix, suffix, input); err != nil {
 				return err
+			}
+		case option.ByChunk:
+			// ここでクロージャーを使っているのは、suffixとchunkIndexを更新するため
+			// TODO: もしうまい具合に関数に切り出せるのであれば切り出す
+			writeContents := func(contents [][]byte) error {
+				for _, content := range contents {
+					suffix = nextSuffix(suffix)
+					chunkIndex++
+
+					if opt.Chunk.K == nil {
+						if err := cli.write(prefix, suffix, content); err != nil {
+							return err
+						}
+					} else {
+						if chunkIndex == *opt.Chunk.K {
+							fmt.Fprintln(cli.Stdout, string(content))
+							return nil
+						}
+					}
+				}
+
+				return nil
+			}
+
+			switch opt.Chunk.Type {
+			case option.LineChunk:
+				onlyLF := regexp.MustCompile(`\r\n|\r|\n`).ReplaceAll(input, []byte("\n"))
+				lines := bytes.Split(onlyLF, []byte("\n"))
+				linesList := splitN(lines, opt.Chunk.N)
+
+				contents := make([][]byte, len(linesList))
+
+				for i, content := range linesList {
+					joined := bytes.Join(content, []byte("\n"))
+					contents[i] = joined
+				}
+
+				if err := writeContents(contents); err != nil {
+					return err
+				}
+
+			case option.ByteChunk:
+				contents := splitN(input, opt.Chunk.N)
+
+				if err := writeContents(contents); err != nil {
+					return err
+				}
+			case option.RoundRobinChunk:
+				onlyLF := regexp.MustCompile(`\r\n|\r|\n`).ReplaceAll(input, []byte("\n"))
+				lines := bytes.Split(onlyLF, []byte("\n"))
+				linesList := splitN(lines, opt.Chunk.N)
+				shuffleRoundRobin(linesList, opt.Chunk.N)
+
+				contents := make([][]byte, len(linesList))
+
+				for i, content := range linesList {
+					joined := bytes.Join(content, []byte("\n"))
+					contents[i] = joined
+				}
+
+				if err := writeContents(contents); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -94,4 +162,18 @@ func (cli *CLI) write(prefix, suffix string, data []byte) error {
 	}
 
 	return nil
+}
+
+func shuffleRoundRobin[T any](a [][]T, n int) {
+	var idx int
+	b := make([][]T, n)
+
+	for i := range a {
+		b[idx] = append(b[idx], a[i]...)
+
+		idx++
+		if idx >= n {
+			idx = 0
+		}
+	}
 }

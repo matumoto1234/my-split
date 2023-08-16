@@ -23,41 +23,88 @@ func Test_CLI_run(t *testing.T) {
 			name:   "4行のテキストを2行ごとに分割した場合、xaaとxabに分割される",
 			prefix: "x",
 			opts: &option.Option{
-				Way: option.ByLine,
-				L:   2,
-				B:   1000,
+				SplitWay: option.ByLine,
+				Line:     2,
+				Byte:     1000,
 			},
-			in: `1
-2
-3
-4`,
+			in: "1\n2\n3\n4",
 			fileToWant: map[string]string{
-				"xaa": `1
-2`,
-				"xab": `3
-4`,
+				"xaa": "1\n2",
+				"xab": "3\n4",
 			},
 			wantErr: false,
 		},
 		{
-			name: "5行のテキストを2行ごとに分割した場合、xaaとxabとxacに分割される",
+			name:   "5行のテキストを2行ごとに分割した場合、xaaとxabとxacに分割される",
 			prefix: "x",
 			opts: &option.Option{
-				Way: option.ByLine,
-				L:   2,
-				B:   1000,
+				SplitWay: option.ByLine,
+				Line:     2,
+				Byte:     1000,
 			},
-			in: `1
-2
-3
-4
-5`,
+			in: "1\n2\n3\n4\n5",
 			fileToWant: map[string]string{
-				"xaa": `1
-2`,
-				"xab": `3
-4`,
-				"xac": `5`,
+				"xaa": "1\n2",
+				"xab": "3\n4",
+				"xac": "5",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "4行のテキストを2バイトごとに分割した場合、xaaとxabとxacとxadに分割される",
+			prefix: "x",
+			opts: &option.Option{
+				SplitWay: option.ByByte,
+				Line:     1000,
+				Byte:     2,
+			},
+			in: "1\n2\n3\n4",
+			fileToWant: map[string]string{
+				"xaa": "1\n",
+				"xab": "2\n",
+				"xac": "3\n",
+				"xad": "4",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "4行のテキストを2チャンクで分割した場合、xaaとxabに分割される",
+			prefix: "x",
+			opts: &option.Option{
+				SplitWay: option.ByChunk,
+				Line:     1000,
+				Byte:     1000,
+				Chunk: &option.Chunk{
+					Type: option.ByteChunk,
+					K:    nil,
+					N:    2,
+				},
+			},
+			in: "1\n2\n3\n4",
+			fileToWant: map[string]string{
+				"xaa": "1\n2\n",
+				"xab": "3\n4",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "4行のテキストをl/3チャンクで分割した場合、xaaとxabとxacに分割される",
+			prefix: "x",
+			opts: &option.Option{
+				SplitWay: option.ByChunk,
+				Line:     1000,
+				Byte:     1000,
+				Chunk: &option.Chunk{
+					Type: option.LineChunk,
+					K:    nil,
+					N:    3,
+				},
+			},
+			in: "1\n2\n3\n4",
+			fileToWant: map[string]string{
+				"xaa": "1\n2\n",
+				"xab": "3\n",
+				"xac": "4",
 			},
 			wantErr: false,
 		},
@@ -66,8 +113,10 @@ func Test_CLI_run(t *testing.T) {
 	for _, test := range tests {
 		test := test
 
+		// t.TempDirに生成されたファイルの中身を確認してテストを行う
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+
 			d := t.TempDir()
 
 			cli := &CLI{
@@ -103,7 +152,7 @@ func Test_CLI_run(t *testing.T) {
 				}
 
 				if !bytes.Equal(got, []byte(want)) {
-					t.Errorf("want: `%s`, got: `%s`", want, got)
+					t.Errorf("file name: %s, want: `%s`, got: `%s`", f.Name(), want, got)
 				}
 			}
 		})
